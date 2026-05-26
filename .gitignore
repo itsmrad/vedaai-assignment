@@ -1,0 +1,32 @@
+# dependencies
+node_modules
+
+# build outputs
+.next/
+out/
+dist/
+*.tsbuildinfo
+
+# turbo
+.turbo
+
+# logs
+*.log
+logs
+
+# env
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# caches
+.eslintcache
+.cache
+
+# os
+.DS_Store
+
+# ides
+.idea
