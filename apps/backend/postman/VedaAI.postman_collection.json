@@ -1,0 +1,378 @@
+{
+  "info": {
+    "name": "VedaAI Backend",
+    "description": "Full coverage of the VedaAI backend API. Variables: baseUrl (defaults to http://localhost:8080), assignmentId (auto-saved by the Create request).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "assignmentId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "00 Health",
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "pm.test('status ok', () => pm.expect(pm.response.json().status).to.eql('ok'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 Create Assignment (no file)",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/api/assignments",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "assignments"]
+        },
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "title", "value": "Photosynthesis Quiz", "type": "text" },
+            { "key": "subject", "value": "Biology", "type": "text" },
+            { "key": "gradeLevel", "value": "Class 10", "type": "text" },
+            {
+              "key": "dueDate",
+              "value": "{{$isoTimestamp}}",
+              "type": "text",
+              "description": "Replace with a future date, e.g. 2026-12-31T23:59:00.000Z"
+            },
+            {
+              "key": "additionalInstructions",
+              "value": "Keep questions student-friendly.",
+              "type": "text"
+            },
+            {
+              "key": "questionConfigs",
+              "value": "[{\"type\":\"mcq\",\"count\":3,\"marksPerQuestion\":2,\"difficultyMix\":{\"easy\":50,\"moderate\":50,\"hard\":0}},{\"type\":\"short_answer\",\"count\":2,\"marksPerQuestion\":5,\"difficultyMix\":{\"easy\":0,\"moderate\":100,\"hard\":0}}]",
+              "type": "text"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('201', () => pm.response.to.have.status(201));",
+              "const j = pm.response.json();",
+              "pm.test('has id', () => pm.expect(j.assignment._id).to.be.a('string'));",
+              "pm.test('queued', () => pm.expect(j.assignment.status).to.eql('queued'));",
+              "pm.collectionVariables.set('assignmentId', j.assignment._id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Create Assignment (with PDF)",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/api/assignments",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "assignments"]
+        },
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "title", "value": "From Source Material", "type": "text" },
+            { "key": "subject", "value": "History", "type": "text" },
+            { "key": "dueDate", "value": "2026-12-31T23:59:00.000Z", "type": "text" },
+            {
+              "key": "questionConfigs",
+              "value": "[{\"type\":\"mcq\",\"count\":4,\"marksPerQuestion\":1,\"difficultyMix\":{\"easy\":100,\"moderate\":0,\"hard\":0}}]",
+              "type": "text"
+            },
+            {
+              "key": "source",
+              "type": "file",
+              "src": [],
+              "description": "Attach a small PDF or .txt file"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "03 Validation: missing title",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/api/assignments",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "assignments"]
+        },
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "dueDate", "value": "2026-12-31T23:59:00.000Z", "type": "text" },
+            {
+              "key": "questionConfigs",
+              "value": "[{\"type\":\"mcq\",\"count\":1,\"marksPerQuestion\":1}]",
+              "type": "text"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('400', () => pm.response.to.have.status(400));",
+              "pm.test('VALIDATION code', () => pm.expect(pm.response.json().error.code).to.eql('VALIDATION'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Validation: past dueDate",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/api/assignments",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "assignments"]
+        },
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "title", "value": "Past Date Test", "type": "text" },
+            { "key": "dueDate", "value": "2020-01-01T00:00:00.000Z", "type": "text" },
+            {
+              "key": "questionConfigs",
+              "value": "[{\"type\":\"mcq\",\"count\":1,\"marksPerQuestion\":1}]",
+              "type": "text"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": { "exec": ["pm.test('400', () => pm.response.to.have.status(400));"] }
+        }
+      ]
+    },
+    {
+      "name": "05 Validation: difficultyMix sum != 100",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/api/assignments",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "assignments"]
+        },
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "title", "value": "Bad Mix", "type": "text" },
+            { "key": "dueDate", "value": "2026-12-31T23:59:00.000Z", "type": "text" },
+            {
+              "key": "questionConfigs",
+              "value": "[{\"type\":\"mcq\",\"count\":1,\"marksPerQuestion\":1,\"difficultyMix\":{\"easy\":30,\"moderate\":30,\"hard\":30}}]",
+              "type": "text"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": { "exec": ["pm.test('400', () => pm.response.to.have.status(400));"] }
+        }
+      ]
+    },
+    {
+      "name": "06 List Assignments",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/assignments?limit=10",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "assignments"],
+          "query": [{ "key": "limit", "value": "10" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "pm.test('items array', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 Get One Assignment",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/assignments/{{assignmentId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "assignments", "{{assignmentId}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('200', () => pm.response.to.have.status(200));",
+              "const a = pm.response.json().assignment;",
+              "pm.test('matches', () => pm.expect(a._id).to.eql(pm.collectionVariables.get('assignmentId')));",
+              "console.log('current status:', a.status);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 Get Paper (poll until completed)",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/assignments/{{assignmentId}}/paper",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "assignments", "{{assignmentId}}", "paper"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 404) {",
+              "  pm.test('still generating', () => pm.expect(pm.response.code).to.eql(404));",
+              "} else {",
+              "  pm.test('200', () => pm.response.to.have.status(200));",
+              "  const p = pm.response.json().paper;",
+              "  pm.test('has sections', () => pm.expect(p.sections.length).to.be.above(0));",
+              "  pm.test('has questions', () => pm.expect(p.sections[0].questions.length).to.be.above(0));",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 Regenerate",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/api/assignments/{{assignmentId}}/regenerate",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "assignments", "{{assignmentId}}", "regenerate"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('202', () => pm.response.to.have.status(202));",
+              "pm.test('queued again', () => pm.expect(pm.response.json().assignment.status).to.eql('queued'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 PDF (first call: enqueue render)",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/assignments/{{assignmentId}}/pdf?studentName=Anish&rollNumber=42&section=A",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "assignments", "{{assignmentId}}", "pdf"],
+          "query": [
+            { "key": "studentName", "value": "Anish" },
+            { "key": "rollNumber", "value": "42" },
+            { "key": "section", "value": "A" }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 202) {",
+              "  pm.test('rendering', () => pm.expect(pm.response.json().status).to.eql('rendering'));",
+              "} else {",
+              "  pm.test('pdf bytes', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf'));",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 PDF (subsequent: cached bytes)",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/assignments/{{assignmentId}}/pdf?studentName=Anish&rollNumber=42&section=A",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "assignments", "{{assignmentId}}", "pdf"],
+          "query": [
+            { "key": "studentName", "value": "Anish" },
+            { "key": "rollNumber", "value": "42" },
+            { "key": "section", "value": "A" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "12 NotFound: bad id",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/assignments/000000000000000000000000",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "assignments", "000000000000000000000000"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": { "exec": ["pm.test('404', () => pm.response.to.have.status(404));"] }
+        }
+      ]
+    },
+    {
+      "name": "13 ValidationError: malformed id",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/assignments/not-an-id",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "assignments", "not-an-id"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": { "exec": ["pm.test('400', () => pm.response.to.have.status(400));"] }
+        }
+      ]
+    }
+  ]
+}

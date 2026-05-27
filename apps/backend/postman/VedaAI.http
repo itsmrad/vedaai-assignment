@@ -1,0 +1,75 @@
+### VedaAI backend manual tests
+### Use the VS Code "REST Client" extension or JetBrains HTTP client.
+### Variables update automatically as you run requests in order.
+
+@baseUrl = http://localhost:8080
+@assignmentId = REPLACE_AFTER_CREATE
+
+### 0. Health
+GET {{baseUrl}}/health
+
+### 1. Create assignment (no file)
+# Captures the assignment id printed in the JSON response.
+POST {{baseUrl}}/api/assignments
+Content-Type: multipart/form-data; boundary=----vedaai
+
+------vedaai
+Content-Disposition: form-data; name="title"
+
+Photosynthesis Quiz
+------vedaai
+Content-Disposition: form-data; name="subject"
+
+Biology
+------vedaai
+Content-Disposition: form-data; name="gradeLevel"
+
+Class 10
+------vedaai
+Content-Disposition: form-data; name="dueDate"
+
+2026-12-31T23:59:00.000Z
+------vedaai
+Content-Disposition: form-data; name="additionalInstructions"
+
+Keep questions student-friendly.
+------vedaai
+Content-Disposition: form-data; name="questionConfigs"
+
+[{"type":"mcq","count":3,"marksPerQuestion":2,"difficultyMix":{"easy":50,"moderate":50,"hard":0}},{"type":"short_answer","count":2,"marksPerQuestion":5,"difficultyMix":{"easy":0,"moderate":100,"hard":0}}]
+------vedaai--
+
+### 2. List
+GET {{baseUrl}}/api/assignments?limit=10
+
+### 3. Get one
+GET {{baseUrl}}/api/assignments/{{assignmentId}}
+
+### 4. Poll paper
+GET {{baseUrl}}/api/assignments/{{assignmentId}}/paper
+
+### 5. Regenerate
+POST {{baseUrl}}/api/assignments/{{assignmentId}}/regenerate
+
+### 6. PDF (first call queues a render, returns 202)
+GET {{baseUrl}}/api/assignments/{{assignmentId}}/pdf?studentName=Anish&rollNumber=42&section=A
+
+### 7. Validation: missing title
+POST {{baseUrl}}/api/assignments
+Content-Type: multipart/form-data; boundary=----v
+
+------v
+Content-Disposition: form-data; name="dueDate"
+
+2026-12-31T23:59:00.000Z
+------v
+Content-Disposition: form-data; name="questionConfigs"
+
+[{"type":"mcq","count":1,"marksPerQuestion":1}]
+------v--
+
+### 8. Not found
+GET {{baseUrl}}/api/assignments/000000000000000000000000
+
+### 9. Bad id
+GET {{baseUrl}}/api/assignments/not-an-id

@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>VedaAI Socket Tester</title>
+    <style>
+      body { font-family: ui-monospace, Menlo, monospace; background: #0b0d10; color: #e6e6e6; padding: 24px; }
+      h1 { margin-top: 0; font-size: 18px; }
+      input, button { font: inherit; padding: 8px 10px; border-radius: 6px; border: 1px solid #2a2f36; background: #14181d; color: #e6e6e6; }
+      button { cursor: pointer; }
+      .row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+      input.id { width: 280px; }
+      input.url { width: 320px; }
+      .ev { padding: 6px 8px; border-left: 3px solid #555; margin: 4px 0; background: #14181d; }
+      .ev.status { border-color: #3b82f6; }
+      .ev.progress { border-color: #f59e0b; }
+      .ev.completed { border-color: #10b981; }
+      .ev.failed { border-color: #ef4444; }
+      .ev .t { color: #6b7280; font-size: 12px; margin-right: 8px; }
+      .ev .n { color: #9ca3af; margin-right: 8px; }
+      pre { white-space: pre-wrap; word-break: break-word; margin: 0; }
+      #status { margin-bottom: 12px; }
+      .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #1f2937; }
+      .pill.ok { background: #064e3b; color: #6ee7b7; }
+      .pill.bad { background: #7f1d1d; color: #fecaca; }
+    </style>
+  </head>
+  <body>
+    <h1>VedaAI Socket.IO Tester</h1>
+
+    <div id="status">Socket: <span id="state" class="pill">disconnected</span></div>
+
+    <div class="row">
+      <input class="url" id="url" placeholder="ws url" value="http://localhost:8080" />
+      <button id="connect">Connect</button>
+      <button id="disconnect">Disconnect</button>
+    </div>
+
+    <div class="row">
+      <input class="id" id="aid" placeholder="assignmentId (24 hex chars)" />
+      <button id="sub">Subscribe</button>
+      <button id="unsub">Unsubscribe</button>
+      <button id="clear">Clear</button>
+    </div>
+
+    <div id="log"></div>
+
+    <!-- Pinned to a specific socket.io-client version that matches the server -->
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let socket = null;
+
+      const setState = (label, ok) => {
+        const el = $('state');
+        el.textContent = label;
+        el.className = 'pill ' + (ok ? 'ok' : 'bad');
+      };
+
+      const log = (kind, name, payload) => {
+        const div = document.createElement('div');
+        div.className = 'ev ' + kind;
+        const t = new Date().toISOString().split('T')[1].replace('Z', '');
+        div.innerHTML =
+          '<span class="t">' + t + '</span>' +
+          '<span class="n">' + name + '</span>' +
+          '<pre>' + (payload === undefined ? '' : JSON.stringify(payload, null, 2)) + '</pre>';
+        $('log').prepend(div);
+      };
+
+      $('connect').onclick = () => {
+        if (socket && socket.connected) return;
+        socket = io($('url').value, { transports: ['websocket'] });
+        socket.on('connect', () => {
+          setState('connected: ' + socket.id, true);
+          log('status', 'connect', { id: socket.id });
+        });
+        socket.on('disconnect', (reason) => {
+          setState('disconnected: ' + reason, false);
+          log('failed', 'disconnect', { reason });
+        });
+        socket.on('connect_error', (err) => {
+          setState('error', false);
+          log('failed', 'connect_error', { message: err.message });
+        });
+        ['assignment:status', 'assignment:progress', 'assignment:completed', 'assignment:failed'].forEach((ev) => {
+          const k = ev.split(':')[1];
+          socket.on(ev, (p) => log(k, ev, p));
+        });
+      };
+
+      $('disconnect').onclick = () => socket && socket.disconnect();
+      $('sub').onclick = () => {
+        if (!socket?.connected) return alert('Not connected');
+        const id = $('aid').value.trim();
+        if (!/^[a-f0-9]{24}$/i.test(id)) return alert('Bad id');
+        socket.emit('assignment:subscribe', id);
+        log('status', 'subscribe (sent)', { assignmentId: id });
+      };
+      $('unsub').onclick = () => {
+        if (!socket?.connected) return;
+        const id = $('aid').value.trim();
+        socket.emit('assignment:unsubscribe', id);
+        log('status', 'unsubscribe (sent)', { assignmentId: id });
+      };
+      $('clear').onclick = () => ($('log').innerHTML = '');
+    </script>
+  </body>
+</html>
