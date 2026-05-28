@@ -11,6 +11,8 @@ function launch(): Promise<Browser> {
   if (!browserPromise) {
     browserPromise = puppeteer.launch({
       headless: true,
+      // Honour PUPPETEER_EXECUTABLE_PATH (set in Docker images that bake their own Chromium)
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
