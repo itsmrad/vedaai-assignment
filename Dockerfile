@@ -25,8 +25,9 @@ WORKDIR /app
 # Copy workspace manifests first for better layer caching
 COPY package.json bun.lock turbo.json ./
 COPY apps/backend/package.json ./apps/backend/
+COPY apps/frontend/package.json ./apps/frontend/
 
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Copy the rest
 COPY apps/backend ./apps/backend
